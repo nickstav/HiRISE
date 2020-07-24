@@ -1,11 +1,9 @@
 def getIdFromUser():
-    while True:
-        DTM_ID = input("Enter a DTM ID (or type 'exit' to quit):\n")
-        validID = checkIdIsValid(DTM_ID)
-        if not validID:
-            continue
-        else:
-            break
+    DTM_ID = str(input("Enter a DTM ID (or type 'exit' to quit):\n"))
+    validID = checkIdIsValid(DTM_ID)
+    if not validID:
+        return None
+
     return DTM_ID
 
 

@@ -1,6 +1,8 @@
 import urllib3
 from bs4 import BeautifulSoup
 
+#require a PoolManager instance to make requests. 
+#this object handles all of the details of connection pooling and thread safety.
 http = urllib3.PoolManager()
 
 
@@ -9,33 +11,63 @@ def getDTMInfo(id):
     page_url = partial_url + id
 
     webPage = getParsedHtml(page_url)
+    
+    imageSource = checkImageSource(webPage)
+    #if no image is found, we can assume the DTM ID was unrecognised by the website
+    if not imageSource:
+        return None
+
     DTMDetails = getDTMDetails(webPage)
+    #create a dictionary to store the required info in
     results = {}
+
 
     title = getTitle(webPage)
     DTMInfo = parseRequiredInfo(DTMDetails)
     elevationRange = getMinMaxElevation(webPage)
-    
-    results["DTM Title"] = title
-    results["Left Observation"] = DTMInfo["leftObservation"]
-    results["Right Observation"] = DTMInfo["rightObservaton"]
+
+    results["DTMTitle"] = title
+    results["ID"] = id
+    results["imageURL"] = imageSource
+    results["leftObservation"] = DTMInfo["leftObservation"]
+    results["rightObservation"] = DTMInfo["rightObservaton"]
     results["Latitude"] = DTMInfo["latitude"]
     results["Longitude"] = DTMInfo["longitude"]
-    results["Min Elevation Range"] = elevationRange["minElevation"]
-    results["Max Elevation Range"] = elevationRange["maxElevation"]
+    results["minElevationRange"] = elevationRange["minElevation"]
+    results["maxElevationRange"] = elevationRange["maxElevation"]
 
-    if title == '':
-        return False
-    else:
-        print("DTM Info successfully obtained")
-        return results
+    checkForIncompleteData(results)
+       
+    print("DTM Info successfully obtained")
+    return results
 
 
 
 def getParsedHtml(url):
-    response = http.request('GET', url)
-    parsedHtml = BeautifulSoup(response.data, 'html.parser')
-    return parsedHtml
+    try:
+        response = http.request('GET', url, timeout=5.0)
+        parsedHtml = BeautifulSoup(response.data, 'html.parser')
+        return parsedHtml
+    except:
+        return None
+
+
+#function to check if webpage has failed to load a specific DTM, by analysing the 
+#image object and its href link. If an image is found, the img src is returned
+#in order to download the image to file
+def checkImageSource(parsedwebPage):
+    try:
+        imageData = parsedwebPage.find(class_='observation-picture')
+        hrefData = imageData.find("a").get("href")
+        #if no image is loaded, the <img> source will be as below:
+        noImageLink = "https://hirise-pds.lpl.arizona.edu/PDS/EXTRAS/DTM/.ca.jpg"
+        if hrefData == noImageLink:
+            return None
+        else: 
+            return hrefData
+    except:
+        return None
+    #the except catch will also deal with an incorrect url (ie if parsedWebPage= None)
 
 
 
@@ -44,14 +76,15 @@ def getTitle(parsedHtml):
     return fullTitle.text
 
 
-
+#function to obtain all the text from the section of the webpage that contains required info
 def getDTMDetails(parsedHtml):
     hiRiseData = parsedHtml.find(class_= 'product-text-gamma')
     relevantDetails = hiRiseData.find_all(text=True)
     return relevantDetails
 
 
-
+#function to take the array containing all text from web section and return the next block of
+#text after a specific title or subheading
 def parseRequiredInfo(details):
     for index, detail in enumerate(details):
         if detail == 'Left observation':
@@ -68,36 +101,42 @@ def parseRequiredInfo(details):
     DTMInfo = {
         "leftObservation": leftObservation,
         "rightObservaton": rightObservation,
-        "latitude": latitude,
-        "longitude": longitude
+        "latitude": float(latitude.strip('°')),
+        "longitude": float(longitude.strip('°')) #strip the symbol & turn the string into a float value
     }   
     return DTMInfo 
 
 
 
 def getMinMaxElevation(parsedHtml):
+    #find the href link to open the readMe page containing elevation info
     readMeLink = parsedHtml.find("a", text="Extras Read me")
     href_link = readMeLink.get("href")
     readMeURL = 'https://www.uahirise.org' + href_link[2:] #remove 2 dots from start of the href link
 
     readMeData = getParsedHtml(readMeURL)
     textString = readMeData.get_text()
+    #split the text string into its separate rows
+    textStringRows = textString.split("\n")
+    #obtain the text from each row that contains "VALID_" and strip any white spaces
+    minMax = [text.strip() for text in textStringRows if ("VALID_" in text)]
 
-    searchStringForMin = "VALID_MINIMUM    = "
-    searchStringForMax = "VALID_MAXIMUM    = "
-    lengthOfRequiredString = 10 #how long the min/max elevation result will be
-
-    startMinimum = textString.index(searchStringForMin) + len(searchStringForMin)
-    endMinimum = startMinimum + lengthOfRequiredString
-    minElevation = textString[startMinimum:endMinimum]
-
-    startMaximum = textString.index(searchStringForMax) + len(searchStringForMax)
-    endMaximum = startMaximum + lengthOfRequiredString
-    maxElevation = textString[startMaximum:endMaximum]
-
+    #only take numerical values of min/max elevation from the section & turn into a single string
+    minElevStringCharacs = [value for value in minMax[0] if (value in "-.0123456789")]
+    minElevation = ''.join(minElevStringCharacs)
+    maxElevStringCharacs = [value for value in minMax[1] if (value in "-.0123456789")]
+    maxElevation = ''.join(maxElevStringCharacs)
+  
     range = {
-        "minElevation": minElevation,
-        "maxElevation": maxElevation
+        "minElevation": float(minElevation),
+        "maxElevation": float(maxElevation) #convert from a string to a float number
     }
   
     return range
+
+def checkForIncompleteData(dictionary):
+    errorMessage = 'this information could not be obtained'
+    for item in dictionary:
+        if item == '':
+            item = errorMessage
+
