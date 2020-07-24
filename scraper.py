@@ -36,8 +36,8 @@ def getDTMInfo(id):
     results["imageURL"] = imageSource
     results["leftObservation"] = DTMInfo["leftObservation"]
     results["rightObservation"] = DTMInfo["rightObservaton"]
-    results["Latitude"] = DTMInfo["latitude"]
-    results["Longitude"] = DTMInfo["longitude"]
+    results["latitude"] = DTMInfo["latitude"]
+    results["longitude"] = DTMInfo["longitude"]
     results["minElevationRange"] = elevationRange["minElevation"]
     results["maxElevationRange"] = elevationRange["maxElevation"]
 
@@ -105,16 +105,15 @@ def parseRequiredInfo(details):
             rightObservation = details[index + 1]
             
         elif detail == 'Latitude (center)':
-            latitude = details[index + 1].encode('utf-8')
-            
+            latitude = details[index + 1].strip()[:-1]
         elif detail == 'Longitude (center)':
-            longitude = details[index + 1].encode('utf-8')
+            longitude = details[index + 1].strip()[:-1]
 
     DTMInfo = {
         "leftObservation": leftObservation,
         "rightObservaton": rightObservation,
-        "latitude": float(latitude.strip('°')),
-        "longitude": float(longitude.strip('°')) #strip the symbol & turn the string into a float value
+        "latitude": float(latitude),
+        "longitude": float(longitude)
     }   
     
     return DTMInfo 
