@@ -1,3 +1,4 @@
+# coding: utf-8
 import urllib3
 from bs4 import BeautifulSoup
 
@@ -10,22 +11,26 @@ def getDTMInfo(id):
     partial_url = 'https://www.uahirise.org/dtm/dtm.php?ID='
     page_url = partial_url + id
 
+    #obtain all the details from the DTM ID's webpage as a string of text
     webPage = getParsedHtml(page_url)
     
+    #get the image source. If no image is found, we can assume the DTM ID was unrecognised by the website
     imageSource = checkImageSource(webPage)
-    #if no image is found, we can assume the DTM ID was unrecognised by the website
     if not imageSource:
         return None
 
+    #obtain the section of the website with all the required details
     DTMDetails = getDTMDetails(webPage)
+
     #create a dictionary to store the required info in
     results = {}
 
-
+    #pick out the title, elevation range & other info from their relevant website sections
     title = getTitle(webPage)
     DTMInfo = parseRequiredInfo(DTMDetails)
     elevationRange = getMinMaxElevation(webPage)
 
+    #add the information to the results dictionary
     results["DTMTitle"] = title
     results["ID"] = id
     results["imageURL"] = imageSource
@@ -36,6 +41,7 @@ def getDTMInfo(id):
     results["minElevationRange"] = elevationRange["minElevation"]
     results["maxElevationRange"] = elevationRange["maxElevation"]
 
+    #replace any blank info with an error message
     checkForIncompleteData(results)
        
     print("DTM Info successfully obtained")
@@ -48,7 +54,8 @@ def getParsedHtml(url):
         response = http.request('GET', url, timeout=5.0)
         parsedHtml = BeautifulSoup(response.data, 'html.parser')
         return parsedHtml
-    except:
+    except Exception as error:
+        print(error)
         return None
 
 
@@ -59,13 +66,17 @@ def checkImageSource(parsedwebPage):
     try:
         imageData = parsedwebPage.find(class_='observation-picture')
         hrefData = imageData.find("a").get("href")
+
         #if no image is loaded, the <img> source will be as below:
         noImageLink = "https://hirise-pds.lpl.arizona.edu/PDS/EXTRAS/DTM/.ca.jpg"
+
         if hrefData == noImageLink:
             return None
         else: 
             return hrefData
-    except:
+
+    except Exception as error:
+        print(error)
         return None
     #the except catch will also deal with an incorrect url (ie if parsedWebPage= None)
 
@@ -94,16 +105,18 @@ def parseRequiredInfo(details):
             rightObservation = details[index + 1]
             
         elif detail == 'Latitude (center)':
-            latitude = details[index + 1]
+            latitude = details[index + 1].encode('utf-8')
             
         elif detail == 'Longitude (center)':
-            longitude = details[index + 1]
+            longitude = details[index + 1].encode('utf-8')
+
     DTMInfo = {
         "leftObservation": leftObservation,
         "rightObservaton": rightObservation,
         "latitude": float(latitude.strip('°')),
         "longitude": float(longitude.strip('°')) #strip the symbol & turn the string into a float value
     }   
+    
     return DTMInfo 
 
 
@@ -116,8 +129,10 @@ def getMinMaxElevation(parsedHtml):
 
     readMeData = getParsedHtml(readMeURL)
     textString = readMeData.get_text()
+
     #split the text string into its separate rows
     textStringRows = textString.split("\n")
+
     #obtain the text from each row that contains "VALID_" and strip any white spaces
     minMax = [text.strip() for text in textStringRows if ("VALID_" in text)]
 
@@ -133,6 +148,8 @@ def getMinMaxElevation(parsedHtml):
     }
   
     return range
+
+
 
 def checkForIncompleteData(dictionary):
     errorMessage = 'this information could not be obtained'

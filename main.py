@@ -1,12 +1,12 @@
-from saveToFile import saveImage, writeJSON
+from saveToFile import saveImage, writeJSON, cleanUpResults
 from scraper import getDTMInfo
-from userInput import getIdFromUser
+from userInput import getIDFromUser
 
 #Test_DTM_ID = "ESP_015943_1390"
 
 def runProject():
     #get the user inputed ID (if incorrect ID was entered, then run function again to request a new one)
-    DTM_ID = getIdFromUser()
+    DTM_ID = getIDFromUser()
     if not DTM_ID:
         runProject() #start again to request a new ID value
         return
@@ -21,6 +21,7 @@ def runProject():
 
     #save the image and a JSON file with required info to the local data folder
     saveImage(relevantInfo, DTM_ID)
+    cleanUpResults(relevantInfo)
     writeJSON(relevantInfo, DTM_ID)
 
     #allow the user to input a new ID once files have been saved
